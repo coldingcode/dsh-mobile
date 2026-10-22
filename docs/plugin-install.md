@@ -41,10 +41,22 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-plugin.ps1 -Source gi
 
 脚本会优先找 PATH 上的 <code>dsh</code>；找不到时会尝试：
 
-- <code>%ProgramFiles%\DeepSeek Harness</code>
-- <code>%LOCALAPPDATA%\Programs\DeepSeek Harness</code>
+- 注册表里的 DeepSeek Harness 安装记录
+- 正在运行的 DeepSeek Harness 进程路径
+- <code>%ProgramFiles%\DeepSeek Harness</code>、<code>%LOCALAPPDATA%\Programs\DeepSeek Harness</code>
+- 各固定磁盘的常见安装目录（例如 <code>D:\Program Files\DeepSeek Harness</code>）
 
-并直接用 Electron 的 Node 模式运行 CLI。
+打包版的 CLI 在 <code>resources\app.asar</code> 内部，PowerShell 无法直接用 Test-Path 检查；脚本会把 asar 路径交给 Electron 执行。安装到非默认盘时可以显式指定：
+
+~~~powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-plugin.ps1 -Local -DshPath "D:\Program Files\DeepSeek Harness"
+~~~
+
+只看解析结果、不实际安装：
+
+~~~powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-plugin.ps1 -Local -DryRun
+~~~
 
 ### macOS
 
