@@ -98,7 +98,7 @@ tunnel: off
    - Domain: 你的域名，例如 <code>example.com</code>
    - Path: 留空
    - Service: **HTTP**
-   - URL: <code>localhost:47821</code>
+   - URL: <code>127.0.0.1:47821</code>（不要写 localhost，避免 Windows 优先解析到 ::1）
 6. 保存后 Cloudflare 会自动创建 <code>dsh.example.com</code> 的 CNAME，**不要**再手动加 A 记录，也不要做端口映射。
 7. 测试：
 
