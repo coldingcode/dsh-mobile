@@ -1,0 +1,288 @@
+name: iOS Build & Self-hosted Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HAS_SIGNING: ${{ secrets.IOS_P12_BASE64 != '' && secrets.IOS_MOBILEPROVISION_BASE64 != '' }}
+  BUNDLE_ID: app.dsh.mobile
+  SITE_URL: ${{ vars.SITE_URL }}
+
+jobs:
+  build:
+    name: Build, sign and publish
+    runs-on: macos-15
+    timeout-minutes: 55
+    environment: github-pages
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+
+      - name: Setup Node and pnpm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install site generator dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Show Xcode and simulator runtimes
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes
+
+      - name: Resolve version and bundle id
+        env:
+          IOS_BUNDLE_ID_SECRET: ${{ secrets.IOS_BUNDLE_ID }}
+        run: |
+          VERSION="0.1.0"
+          TAG_NAME="snapshot"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            TAG_NAME="$GITHUB_REF_NAME"
+            VERSION="$(echo "$TAG_NAME" | sed 's/^v//')"
+          fi
+          BUILD_NUMBER="$GITHUB_RUN_NUMBER"
+          if [ -n "$IOS_BUNDLE_ID_SECRET" ]; then BUNDLE_ID="$IOS_BUNDLE_ID_SECRET"; fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "BUNDLE_ID=$BUNDLE_ID" >> "$GITHUB_ENV"
+          echo "Building dsh-mobile $VERSION ($BUILD_NUMBER) for $BUNDLE_ID"
+
+      - name: Build for iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/dsh-mobile.xcodeproj \
+            -scheme dsh-mobile \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedDataSim" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            build 2>&1 | tee "$RUNNER_TEMP/xcodebuild-sim.log"
+
+      - name: Boot simulator and capture onboarding screenshot
+        run: |
+          APP_PATH="$(find "$RUNNER_TEMP/DerivedDataSim/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "Simulator app not found"
+            find "$RUNNER_TEMP/DerivedDataSim/Build/Products" -maxdepth 3 -type d | head -40
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH"
+          DEVICE_ID="$(python3 - <<'PY'
+          import json, subprocess
+          data = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True))
+          for runtime, devices in data.get("devices", {}).items():
+              for device in devices:
+                  if device.get("isAvailable") and device.get("name", "").startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone simulator")
+          PY
+          )"
+          echo "Using simulator $DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl status_bar "$DEVICE_ID" override \
+            --time "9:41" \
+            --dataNetwork wifi --wifiMode active --wifiBars 3 \
+            --cellularMode active --cellularBars 4 \
+            --batteryState charged --batteryLevel 100 2>/dev/null || true
+          xcrun simctl install "$DEVICE_ID" "$APP_PATH"
+          xcrun simctl launch "$DEVICE_ID" "$BUNDLE_ID" -dshmDemo -dshmReset
+          sleep 5
+          xcrun simctl io "$DEVICE_ID" screenshot ios-onboarding.png
+
+      - name: Build unsigned device IPA
+        run: |
+          set -o pipefail
+          chmod +x ios/scripts/build-ipa.sh
+          MARKETING_VERSION="$VERSION" \
+          CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+          IOS_BUNDLE_ID="$BUNDLE_ID" \
+          ios/scripts/build-ipa.sh unsigned "$PWD/dist/ios" 2>&1 | tee "$RUNNER_TEMP/xcodebuild-device.log"
+
+      - name: Prepare signing material
+        if: env.HAS_SIGNING == 'true'
+        env:
+          P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_MOBILEPROVISION_BASE64 }}
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          EXPORT_METHOD_SECRET: ${{ secrets.IOS_EXPORT_METHOD }}
+        run: |
+          if [ -z "$P12_BASE64" ] || [ -z "$PROFILE_BASE64" ] || [ -z "$TEAM_ID" ]; then
+            echo "Signing secrets are incomplete"
+            exit 1
+          fi
+          METHOD="$EXPORT_METHOD_SECRET"
+          if [ -z "$METHOD" ]; then METHOD=ad-hoc; fi
+          python3 -c "import base64,os; open('cert.p12','wb').write(base64.b64decode(os.environ['P12_BASE64']))"
+          python3 -c "import base64,os; open('profile.mobileprovision','wb').write(base64.b64decode(os.environ['PROFILE_BASE64']))"
+          KEYCHAIN_PASSWORD="$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import cert.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_UUID="$(security cms -D -i profile.mobileprovision | plutil -extract UUID raw -)"
+          PROFILE_NAME="$(security cms -D -i profile.mobileprovision | plutil -extract Name raw -)"
+          cp profile.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>$METHOD</string>
+            <key>teamID</key>
+            <string>$TEAM_ID</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>compileBitcode</key>
+            <false/>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$BUNDLE_ID</key>
+              <string>$PROFILE_NAME</string>
+            </dict>
+          </dict>
+          </plist>
+          PLIST
+          {
+            echo "IOS_TEAM_ID=$TEAM_ID"
+            echo "IOS_PROFILE_NAME=$PROFILE_NAME"
+            echo "IOS_EXPORT_METHOD=$METHOD"
+            echo "IOS_EXPORT_OPTIONS=$RUNNER_TEMP/ExportOptions.plist"
+          } >> "$GITHUB_ENV"
+          echo "Signing material ready for $PROFILE_NAME ($METHOD)"
+
+      - name: Build signed IPA
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          set -o pipefail
+          MARKETING_VERSION="$VERSION" \
+          CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+          IOS_BUNDLE_ID="$BUNDLE_ID" \
+          ios/scripts/build-ipa.sh signed "$PWD/dist/ios" 2>&1 | tee "$RUNNER_TEMP/xcodebuild-signed.log"
+
+      - name: Generate install page and AltStore source
+        env:
+          NOTES: ${{ github.event.head_commit.message }}
+        run: |
+          mkdir -p dist
+          SIGNED_PATH=""
+          if [ -f "dist/ios/dsh-mobile-signed.ipa" ]; then SIGNED_PATH="dist/ios/dsh-mobile-signed.ipa"; fi
+          if [ -z "$SITE_URL" ]; then unset SITE_URL; fi
+          SITE_URL="$SITE_URL" \
+          VERSION="$VERSION" \
+          BUILD="$BUILD_NUMBER" \
+          TAG="$TAG_NAME" \
+          REPO="$GITHUB_REPOSITORY" \
+          BUNDLE_ID="$BUNDLE_ID" \
+          IPA_PATH="$PWD/dist/ios/dsh-mobile-unsigned.ipa" \
+          SIGNED_IPA_PATH="$SIGNED_PATH" \
+          NOTES="$NOTES" \
+          node scripts/make-site.mjs
+          (cd site && zip -qry "$RUNNER_TEMP/dsh-mobile-site.zip" .)
+
+      - name: Checksums
+        run: |
+          cd dist/ios
+          shasum -a 256 *.ipa > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload iOS artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-mobile-ios
+          path: |
+            dist/ios/*.ipa
+            dist/ios/SHA256SUMS.txt
+            ios-onboarding.png
+            site/
+            ${{ runner.temp }}/xcodebuild-*.log
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: dsh-mobile ${{ env.TAG_NAME }}
+          tag_name: ${{ env.TAG_NAME }}
+          body: |
+            ## dsh-mobile ${{ env.VERSION }}
+
+            这是 GitHub Actions 构建的自托管版本，不经过 App Store。
+
+            - 推荐：通过 AltStore / SideStore 添加源安装
+            - 也可以下载未签名 IPA，用 SideStore、Sideloadly 或你自己的证书自签
+            - 安装页：${{ vars.SITE_URL || format('https://{0}.github.io/{1}/', github.repository_owner, github.event.repository.name) }}
+            - 首次打开前在「设置 → 通用 → VPN 与设备管理」中信任开发者证书
+
+            配对前请确保手机与电脑在同一局域网，并在电脑的 DSH 插件配对页确认设备。
+          files: |
+            dist/ios/dsh-mobile-unsigned.ipa
+            dist/ios/dsh-mobile-signed.ipa
+            dist/ios/SHA256SUMS.txt
+            ios-onboarding.png
+            site/altstore.json
+            site/manifest.plist
+            ${{ runner.temp }}/dsh-mobile-site.zip
+          fail_on_unmatched_files: false
+
+      - name: Setup Pages
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        if: startsWith(github.ref, 'refs/tags/')
+        id: deployment
+        uses: actions/deploy-pages@v4

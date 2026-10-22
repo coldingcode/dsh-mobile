@@ -1,0 +1,12 @@
+node_modules/
+.tmp/
+dist/
+.DS_Store
+*.log
+ios/build/
+ios/DerivedData/
+ios/*.xcodeproj
+site/
+state.json
+devices.json
+sessions/

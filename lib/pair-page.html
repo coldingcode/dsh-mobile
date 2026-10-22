@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>{{SERVER_NAME}} · dsh-mobile</title>
+<style>
+  :root {
+    --bg: #07070c;
+    --ink: #f7f7fb;
+    --muted: rgba(235, 236, 255, .58);
+    --line: rgba(255, 255, 255, .13);
+    --glass: rgba(255, 255, 255, .07);
+    --glass-strong: rgba(255, 255, 255, .115);
+    --accent: #7c8cff;
+    --accent-2: #56d7ff;
+    --danger: #ff6b81;
+    --ok: #5ee6a8;
+    --shadow: 0 30px 90px rgba(0, 0, 0, .55);
+    --radius: 30px;
+  }
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    margin: 0; color: var(--ink); background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  body::before, body::after {
+    content: ""; position: fixed; width: 52vw; height: 52vw; border-radius: 999px;
+    filter: blur(100px); opacity: .42; pointer-events: none; z-index: 0;
+  }
+  body::before { left: -18vw; top: -18vw; background: radial-gradient(circle at 40% 40%, #5b6cff, transparent 66%); }
+  body::after { right: -20vw; bottom: -24vw; background: radial-gradient(circle at 50% 50%, #26c9d8, transparent 68%); }
+  .wrap { position: relative; z-index: 1; width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 44px 0 54px; }
+  .topbar { display: flex; align-items: center; gap: 16px; margin-bottom: 38px; }
+  .brand-mark {
+    width: 54px; height: 54px; border-radius: 17px; flex: 0 0 auto;
+    background:
+      radial-gradient(120% 120% at 20% 10%, rgba(255,255,255,.95), rgba(255,255,255,.45) 18%, transparent 44%),
+      linear-gradient(145deg, #7a8cff 0%, #4b5ce6 42%, #1f2448 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.68), inset 0 -12px 24px rgba(0,0,0,.28), 0 16px 40px rgba(68, 88, 255, .38);
+    display: grid; place-items: center; font-weight: 800; font-size: 22px; letter-spacing: -.06em;
+  }
+  .brand-title { display: flex; flex-direction: column; gap: 3px; }
+  .brand-title strong { font-size: 21px; letter-spacing: -.03em; font-weight: 700; }
+  .brand-title small { color: var(--muted); font-size: 12.5px; letter-spacing: .02em; }
+  .status {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 9px; padding: 10px 16px; border-radius: 999px;
+    border: 1px solid var(--line); background: rgba(255,255,255,.06); backdrop-filter: blur(24px) saturate(160%);
+    font-size: 12.5px; color: rgba(255,255,255,.82); box-shadow: inset 0 1px 0 rgba(255,255,255,.16);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-2); box-shadow: 0 0 14px var(--accent-2); animation: breathe 2.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: .4; transform: scale(.8); } }
+  .hero { display: grid; grid-template-columns: 1.15fr .85fr; gap: 26px; align-items: stretch; }
+  .glass {
+    position: relative; border: 1px solid var(--line); border-radius: var(--radius);
+    background: linear-gradient(145deg, var(--glass-strong), rgba(255,255,255,.035));
+    box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.18);
+    backdrop-filter: blur(34px) saturate(170%); -webkit-backdrop-filter: blur(34px) saturate(170%); overflow: hidden;
+  }
+  .glass::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(120deg, rgba(255,255,255,.18), transparent 26%, transparent 72%, rgba(255,255,255,.07));
+    mix-blend-mode: screen;
+  }
+  .pair-card { padding: 34px; display: flex; gap: 34px; align-items: center; }
+  .qr-wrap {
+    position: relative; flex: 0 0 284px; width: 284px; height: 284px; border-radius: 34px; padding: 17px;
+    background: #fff; box-shadow: 0 26px 70px rgba(0,0,0,.5), inset 0 0 0 1px rgba(0,0,0,.04);
+  }
+  .qr-wrap img { width: 100%; height: 100%; display: block; border-radius: 20px; }
+  .qr-corners span { position: absolute; width: 26px; height: 26px; border: 2.5px solid var(--accent); opacity: .9; }
+  .qr-corners span:nth-child(1) { left: -8px; top: -8px; border-right: 0; border-bottom: 0; border-radius: 13px 0 0 0; }
+  .qr-corners span:nth-child(2) { right: -8px; top: -8px; border-left: 0; border-bottom: 0; border-radius: 0 13px 0 0; }
+  .qr-corners span:nth-child(3) { left: -8px; bottom: -8px; border-right: 0; border-top: 0; border-radius: 0 0 0 13px; }
+  .qr-corners span:nth-child(4) { right: -8px; bottom: -8px; border-left: 0; border-top: 0; border-radius: 0 0 13px 0; }
+  .pair-copy { min-width: 0; flex: 1; position: relative; z-index: 1; }
+  .eyebrow { color: var(--accent-2); font-size: 12px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; }
+  h1 { margin: 10px 0 10px; font-size: clamp(30px, 3.3vw, 44px); line-height: 1.05; letter-spacing: -.045em; font-weight: 720; }
+  .lede { margin: 0 0 24px; color: var(--muted); font-size: 14.5px; line-height: 1.75; max-width: 44ch; }
+  .lede strong { color: rgba(255,255,255,.88); font-weight: 600; }
+  .code-block { display: inline-flex; align-items: center; gap: 14px; padding: 12px 16px 12px 18px; border-radius: 18px; background: rgba(0,0,0,.26); border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+  .code-label { color: var(--muted); font-size: 11.5px; letter-spacing: .05em; }
+  .pair-code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 22px; letter-spacing: .12em; font-weight: 650; }
+  .copy-btn, .ghost-btn, .primary-btn, .danger-btn {
+    appearance: none; border: 0; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: transform .18s cubic-bezier(.2,.8,.2,1), background .18s ease, opacity .18s ease, filter .18s ease;
+  }
+  .copy-btn { width: 36px; height: 36px; border-radius: 12px; background: rgba(255,255,255,.09); color: var(--ink); display: grid; place-items: center; border: 1px solid rgba(255,255,255,.1); }
+  .copy-btn:hover { background: rgba(255,255,255,.16); }
+  .copy-btn:active { transform: scale(.94); }
+  .timer { margin-top: 22px; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
+  .timer-track { width: min(240px, 100%); height: 5px; border-radius: 999px; background: rgba(255,255,255,.1); overflow: hidden; }
+  .timer-fill { height: 100%; width: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .4s linear; }
+  .side { display: flex; flex-direction: column; gap: 26px; }
+  .side-card { padding: 26px; position: relative; z-index: 1; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .card-head h2 { margin: 0; font-size: 14px; letter-spacing: -.01em; font-weight: 650; }
+  .badge { min-width: 24px; height: 24px; padding: 0 8px; border-radius: 999px; display: inline-grid; place-items: center; background: rgba(124,140,255,.18); color: #c6ceff; font-size: 11.5px; font-weight: 650; border: 1px solid rgba(124,140,255,.24); }
+  .empty { color: var(--muted); font-size: 13px; line-height: 1.7; padding: 14px 0 6px; }
+  .empty strong { color: rgba(255,255,255,.82); font-weight: 560; }
+  .request { padding: 16px 0; border-top: 1px solid rgba(255,255,255,.08); }
+  .request:first-of-type { border-top: 0; padding-top: 0; }
+  .request-row { display: flex; gap: 12px; align-items: flex-start; }
+  .request-main { min-width: 0; flex: 1; }
+  .request-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .request-meta { color: var(--muted); font-size: 11.5px; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .verify { flex: 0 0 auto; text-align: center; padding: 7px 10px; min-width: 82px; border-radius: 14px; background: rgba(124,140,255,.13); border: 1px solid rgba(124,140,255,.22); }
+  .verify small { display: block; color: #aeb9ff; font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 2px; }
+  .verify strong { font-family: "SF Mono", ui-monospace, monospace; font-size: 18px; letter-spacing: .12em; color: #eef0ff; }
+  .request-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .primary-btn { flex: 1; padding: 10px 14px; border-radius: 13px; color: #fff; background: linear-gradient(145deg, #7d8dff, #4e5fe0); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 10px 24px rgba(72,86,220,.32); font-size: 12.5px; font-weight: 600; }
+  .primary-btn:hover { filter: brightness(1.06); }
+  .primary-btn:active { transform: scale(.98); }
+  .danger-btn { padding: 10px 14px; border-radius: 13px; color: #ffc2ca; background: rgba(255,107,129,.1); border: 1px solid rgba(255,107,129,.2); font-size: 12.5px; }
+  .danger-btn:hover { background: rgba(255,107,129,.18); }
+  .ghost-btn { padding: 9px 13px; border-radius: 12px; color: var(--muted); background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.09); font-size: 11.5px; }
+  .ghost-btn:hover { color: var(--ink); background: rgba(255,255,255,.1); }
+  .devices { display: flex; flex-direction: column; gap: 2px; }
+  .device { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.07); }
+  .device:first-child { border-top: 0; }
+  .device-icon { width: 36px; height: 36px; border-radius: 12px; background: rgba(255,255,255,.07); display: grid; place-items: center; border: 1px solid rgba(255,255,255,.08); font-size: 15px; }
+  .device-main { flex: 1; min-width: 0; }
+  .device-name { font-size: 13px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .device-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .device .ghost-btn { padding: 7px 10px; }
+  .footer { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; color: rgba(235,236,255,.42); font-size: 11.5px; }
+  .footer .mono { font-family: "SF Mono", ui-monospace, monospace; color: rgba(235,236,255,.6); }
+  .security { display: flex; align-items: center; gap: 7px; color: rgba(94,230,168,.8); }
+  .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; background: rgba(18,18,28,.86); border: 1px solid rgba(255,255,255,.16); color: var(--ink); padding: 11px 18px; border-radius: 999px; font-size: 12.5px; box-shadow: 0 18px 50px rgba(0,0,0,.45); backdrop-filter: blur(20px); transition: all .25s cubic-bezier(.2,.8,.2,1); z-index: 10; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (max-width: 920px) {
+    .hero { grid-template-columns: 1fr; }
+    .pair-card { flex-direction: column; align-items: flex-start; padding: 28px; }
+    .qr-wrap { width: min(284px, 100%); height: auto; aspect-ratio: 1; flex: none; }
+    .side { gap: 18px; }
+  }
+  @media (max-width: 560px) {
+    .wrap { width: min(100% - 28px, 1180px); padding-top: 26px; }
+    .topbar { margin-bottom: 22px; }
+    .status { display: none; }
+    .pair-card { padding: 22px; gap: 24px; }
+    .glass { border-radius: 26px; }
+    h1 { font-size: 32px; }
+    .side-card { padding: 22px; }
+    .brand-mark { width: 46px; height: 46px; border-radius: 14px; font-size: 19px; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand-mark">d</div>
+    <div class="brand-title"><strong>dsh-mobile</strong><small>本机 DeepSeek Harness · 手机配对</small></div>
+    <div class="status"><span class="dot"></span><span id="status-text">等待手机扫码</span></div>
+  </header>
+
+  <main class="hero">
+    <section class="glass pair-card">
+      <div class="qr-wrap">
+        <div class="qr-corners"><span></span><span></span><span></span><span></span></div>
+        <img id="qr" alt="手机配对二维码">
+      </div>
+      <div class="pair-copy">
+        <div class="eyebrow">Local pairing</div>
+        <h1>把本机 DSH<br>放到手机上。</h1>
+        <p class="lede">用 <strong>dsh-mobile</strong> App 扫描左侧二维码。手机和电脑需要处于同一局域网；配对请求会在这里等你确认。</p>
+        <div class="code-block">
+          <div><div class="code-label">手动配对码</div><div class="pair-code" id="pair-code">········</div></div>
+          <button class="copy-btn" id="copy-code" title="复制配对码" aria-label="复制配对码">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2.4"/><path d="M5 15V6.5A1.5 1.5 0 0 1 6.5 5H15"/></svg>
+          </button>
+        </div>
+        <div class="timer"><div class="timer-track"><div class="timer-fill" id="timer-fill"></div></div><span id="timer-text">10:00 后刷新</span></div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="glass side-card">
+        <div class="card-head"><h2>配对请求</h2><span class="badge" id="pending-count">0</span></div>
+        <div id="pending"><div class="empty">扫码后，手机会出现在这里。<br><strong>核对两侧的 6 位数字</strong>，再点允许。</div></div>
+      </section>
+      <section class="glass side-card">
+        <div class="card-head"><h2>已信任设备</h2><span class="badge" id="device-count">0</span></div>
+        <div id="devices" class="devices"><div class="empty">还没有已配对的设备。</div></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <div class="security">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 5 6v5.5c0 4.4 2.8 7.5 7 9.5 4.2-2 7-5.1 7-9.5V6l-7-3Z"/><path d="m9.5 12 1.8 1.8L15 10"/></svg>
+      配对页仅本机可访问 · 令牌只保存在手机钥匙串
+    </div>
+    <div>服务：<span class="mono">{{SERVER_URL}}</span></div>
+    <div>指纹：<span class="mono">{{FINGERPRINT}}</span></div>
+    <div>v{{VERSION}}</div>
+    <button class="ghost-btn" id="rotate">刷新二维码</button>
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const admin = new URLSearchParams(location.search).get('admin') || '';
+  const byId = (id) => document.getElementById(id);
+  const state = { data: null, qrCode: '', toastTimer: 0 };
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const api = (path, options = {}) => fetch(path + (path.includes('?') ? '&' : '?') + 'admin=' + encodeURIComponent(admin), {
+    ...options,
+    headers: { 'content-type': 'application/json', ...(options.headers || {}) },
+    cache: 'no-store',
+  }).then(async (response) => {
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || body.error || ('HTTP ' + response.status));
+    return body;
+  });
+  const toast = (message) => {
+    const node = byId('toast');
+    node.textContent = message;
+    node.classList.add('show');
+    clearTimeout(state.toastTimer);
+    state.toastTimer = setTimeout(() => node.classList.remove('show'), 2200);
+  };
+  const relative = (time) => {
+    const delta = Math.max(0, Date.now() - Number(time || 0));
+    if (delta < 60000) return '刚刚';
+    if (delta < 3600000) return Math.floor(delta / 60000) + ' 分钟前';
+    if (delta < 86400000) return Math.floor(delta / 3600000) + ' 小时前';
+    return Math.floor(delta / 86400000) + ' 天前';
+  };
+  const iconFor = (platform) => {
+    const p = String(platform || '').toLowerCase();
+    if (p.includes('ios') || p.includes('iphone')) return '◫';
+    if (p.includes('android')) return '◉';
+    return '▣';
+  };
+  function renderPending(items) {
+    const wrap = byId('pending');
+    byId('pending-count').textContent = String(items.length);
+    if (!items.length) {
+      wrap.innerHTML = '<div class="empty">扫码后，手机会出现在这里。<br><strong>核对两侧的 6 位数字</strong>，再点允许。</div>';
+      return;
+    }
+    wrap.innerHTML = items.map((item) => (
+      '<div class="request">' +
+        '<div class="request-row">' +
+          '<div class="request-main">' +
+            '<div class="request-name">' + esc(item.deviceName) + '</div>' +
+            '<div class="request-meta">' + esc(item.ip) + ' · ' + esc(item.platform) + ' · ' + relative(item.createdAt) + '</div>' +
+          '</div>' +
+          '<div class="verify"><small>核对码</small><strong>' + esc(item.verificationCode) + '</strong></div>' +
+        '</div>' +
+        '<div class="request-actions">' +
+          '<button class="primary-btn" data-approve="' + esc(item.id) + '">允许连接</button>' +
+          '<button class="danger-btn" data-deny="' + esc(item.id) + '">拒绝</button>' +
+        '</div>' +
+      '</div>'
+    )).join('');
+  }
+  function renderDevices(items) {
+    const wrap = byId('devices');
+    byId('device-count').textContent = String(items.length);
+    if (!items.length) {
+      wrap.innerHTML = '<div class="empty">还没有已配对的设备。</div>';
+      return;
+    }
+    wrap.innerHTML = items.map((item) => (
+      '<div class="device">' +
+        '<div class="device-icon">' + esc(iconFor(item.platform)) + '</div>' +
+        '<div class="device-main">' +
+          '<div class="device-name">' + esc(item.name) + (item.current ? ' <span style="color:#aeb9ff;font-size:10px">本机</span>' : '') + '</div>' +
+          '<div class="device-meta">' + esc(item.platform) + ' · 最近 ' + relative(item.lastSeenAt) + '</div>' +
+        '</div>' +
+        '<button class="ghost-btn" data-revoke="' + esc(item.id) + '">移除</button>' +
+      '</div>'
+    )).join('');
+  }
+  function render(data) {
+    state.data = data;
+    byId('pair-code').textContent = data.pairCode;
+    byId('status-text').textContent = data.pending.length ? '有 ' + data.pending.length + ' 个配对请求' : '等待手机扫码';
+    renderPending(data.pending || []);
+    renderDevices(data.devices || []);
+    if (state.qrCode !== data.pairCode) {
+      state.qrCode = data.pairCode;
+      byId('qr').src = '/admin/qr.svg?admin=' + encodeURIComponent(admin) + '&t=' + Date.now();
+    }
+    updateTimer();
+  }
+  function updateTimer() {
+    if (!state.data) return;
+    const left = Math.max(0, Number(state.data.codeExpiresAt || 0) - Date.now());
+    const total = Math.max(1, Number(state.data.codeTtlSeconds || 600) * 1000);
+    const ratio = Math.min(1, left / total);
+    byId('timer-fill').style.width = (ratio * 100).toFixed(2) + '%';
+    const mins = Math.floor(left / 60000);
+    const secs = Math.floor((left % 60000) / 1000);
+    byId('timer-text').textContent = left <= 0 ? '二维码已过期，请刷新' : mins + ':' + String(secs).padStart(2, '0') + ' 后可刷新';
+  }
+  async function refresh() {
+    try {
+      const data = await api('/admin/state');
+      render(data);
+    } catch (error) {
+      byId('status-text').textContent = '无法读取配对状态';
+    }
+  }
+  byId('copy-code').addEventListener('click', async () => {
+    if (!state.data) return;
+    await navigator.clipboard.writeText(state.data.pairCode).catch(() => {});
+    toast('配对码已复制');
+  });
+  byId('rotate').addEventListener('click', async () => {
+    try {
+      await api('/admin/rotate', { method: 'POST', body: '{}' });
+      state.qrCode = '';
+      toast('已生成新的二维码');
+      await refresh();
+    } catch (error) { toast(error.message); }
+  });
+  document.addEventListener('click', async (event) => {
+    const target = event.target.closest('[data-approve],[data-deny],[data-revoke]');
+    if (!target) return;
+    const id = target.getAttribute('data-approve') || target.getAttribute('data-deny') || target.getAttribute('data-revoke');
+    if (!id) return;
+    try {
+      if (target.hasAttribute('data-approve')) await api('/admin/requests/' + encodeURIComponent(id) + '/approve', { method: 'POST', body: '{}' });
+      else if (target.hasAttribute('data-deny')) await api('/admin/requests/' + encodeURIComponent(id) + '/deny', { method: 'POST', body: '{}' });
+      else if (target.hasAttribute('data-revoke')) {
+        if (!confirm('移除后，这台设备需要重新扫码配对。继续？')) return;
+        await api('/admin/devices/' + encodeURIComponent(id) + '/revoke', { method: 'POST', body: '{}' });
+      }
+      toast('操作完成');
+      await refresh();
+    } catch (error) { toast(error.message || '操作失败'); }
+  });
+  refresh();
+  setInterval(refresh, 1600);
+  setInterval(updateTimer, 1000);
+})();
+</script>
+</body>
+</html>

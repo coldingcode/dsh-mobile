@@ -1,0 +1,17 @@
+# dsh-mobile — pair your phone with the DSH running on this computer.
+# This patch is applied by the DSH profile when the package is selected as a bundle.
+- insert:
+    - id: dsh-mobile
+      name: dsh-mobile
+      config:
+        # Port of the LAN bridge. 0 picks a free port.
+        port: 47821
+        # Bind all local interfaces so the phone can reach this computer.
+        bindHost: 0.0.0.0
+        # "workspace-write" is the safe default. Use "danger-full-access" to let
+        # the phone run unrestricted tools; the app warns before connecting.
+        permissionMode: workspace-write
+        provider: deepseek-official
+        model: deepseek-flash
+        openPairingPage: true
+        printTerminalQr: true

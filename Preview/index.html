@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsh-mobile · design preview</title>
+<style>
+  :root { --bg:#07070c; --ink:#f7f7fb; --muted:rgba(235,236,255,.55); --line:rgba(255,255,255,.12); --accent:#7c8cff; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink);
+    background:
+      radial-gradient(70% 50% at 20% -10%, rgba(86,104,255,.28), transparent 60%),
+      radial-gradient(60% 50% at 100% 100%, rgba(32,196,220,.16), transparent 60%),
+      var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { width: min(1240px, calc(100% - 36px)); margin: 0 auto; padding: 42px 0 60px; }
+  header { display: flex; align-items: center; gap: 16px; margin-bottom: 34px; }
+  .logo { width: 58px; height: 58px; border-radius: 17px; overflow: hidden; box-shadow: 0 18px 44px rgba(74,92,255,.34); }
+  .logo img { width: 100%; height: 100%; display: block; }
+  .brand strong { display: block; font-size: 22px; letter-spacing: -.04em; }
+  .brand span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .tag { margin-left: auto; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 11.5px; background: rgba(255,255,255,.05); }
+  h1 { margin: 0 0 10px; font-size: clamp(32px, 5vw, 52px); line-height: 1.02; letter-spacing: -.05em; }
+  .lede { margin: 0 0 34px; max-width: 62ch; color: var(--muted); font-size: 14px; line-height: 1.75; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .card { margin: 0; border: 1px solid var(--line); border-radius: 26px; overflow: hidden; background: rgba(255,255,255,.04); box-shadow: 0 24px 70px rgba(0,0,0,.34); }
+  .card img { display: block; width: 100%; height: auto; }
+  figcaption { padding: 13px 15px; color: var(--muted); font-size: 11.5px; border-top: 1px solid var(--line); }
+  .foot { margin-top: 32px; display: flex; flex-wrap: wrap; gap: 8px 20px; color: rgba(235,236,255,.38); font-size: 11px; }
+  .foot .mono { font-family: "SF Mono", ui-monospace, monospace; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .tag { display: none; } .wrap { width: min(100% - 24px, 1240px); padding-top: 26px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><img src="../assets/icon.png" alt="dsh-mobile icon"></div>
+    <div class="brand"><strong>dsh-mobile</strong><span>iOS 26 Liquid Glass · 本机 DSH 的移动壳</span></div>
+    <div class="tag">Design preview · v0.1.0</div>
+  </header>
+  <h1>本机 DSH，<br>在手上继续。</h1>
+  <p class="lede">扫码把 iPhone 绑定到电脑上的 DeepSeek Harness。会话、工具调用、文件和命令都留在电脑；手机只负责发消息和确认。下面是实际构建的 Web UI 与配对页截图。</p>
+  <div class="grid">
+    <figure class="card"><img src="screenshots/00-overview-dark.png" alt="深色界面总览"><figcaption>深色 · 对话 / 工具 / 活动 / 设置</figcaption></figure>
+    <figure class="card"><img src="screenshots/00-overview-light.png" alt="浅色与配对页总览"><figcaption>浅色 · 对话 / 浏览器配对 / 电脑配对页</figcaption></figure>
+    <figure class="card"><img src="screenshots/07-web-pairing.png" alt="Web 配对页"><figcaption>浏览器手动配对 · 6 位核对码</figcaption></figure>
+    <figure class="card"><img src="screenshots/08-desktop-pairing.png" alt="电脑配对页"><figcaption>电脑端 · 二维码 / 配对请求 / 已信任设备</figcaption></figure>
+  </div>
+  <footer class="foot">
+    <div>MIT · self-hosted</div>
+    <div>不是 App Store 版本 · GitHub Actions 自签构建</div>
+    <div class="mono">Preview/screenshots</div>
+  </footer>
+</div>
+</body>
+</html>

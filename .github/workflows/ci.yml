@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plugin:
+    name: Plugin, web and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Build plugin and web app
+        run: pnpm build
+
+      - name: Smoke test bridge and UI assets
+        run: |
+          node -e "const fs=require('fs'); const ok=['lib/index.js','lib/pair-page.html','web-dist/index.html','web-dist/manifest.webmanifest'].every(p=>fs.existsSync(p)); if(!ok){console.error('missing build output');process.exit(1)}; console.log('build outputs present')"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-mobile-build
+          path: |
+            lib/
+            web-dist/
+            cordis.patch.yml
+            assets/icon.png
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="gloss" cx="24%" cy="14%" r="72%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".92"/>
+      <stop offset=".2" stop-color="#ffffff" stop-opacity=".34"/>
+      <stop offset=".55" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8e9cff"/>
+      <stop offset=".46" stop-color="#5364ea"/>
+      <stop offset="1" stop-color="#1a2046"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".8"/>
+      <stop offset=".44" stop-color="#ffffff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".2"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="#07070c"/>
+  <rect x="56" y="56" width="912" height="912" rx="206" fill="url(#body)"/>
+  <rect x="56" y="56" width="912" height="912" rx="206" fill="url(#gloss)"/>
+  <rect x="57.5" y="57.5" width="909" height="909" rx="204.5" fill="none" stroke="url(#edge)" stroke-width="3"/>
+  <path d="M354 314v396h142c134 0 218-76 218-198s-84-198-218-198H354Zm116 96h26c70 0 112 38 112 102s-42 102-112 102h-26V410Z" fill="#fff" fill-opacity=".96"/>
+  <path d="M674 312l18 48 48 18-48 18-18 48-18-48-48-18 48-18 18-48Z" fill="#bff5ff"/>
+  <path d="M722 548l11 29 29 11-29 11-11 29-11-29-29-11 29-11 11-29Z" fill="#ffffff" fill-opacity=".7"/>
+</svg>

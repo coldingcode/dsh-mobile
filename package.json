@@ -1,0 +1,67 @@
+{
+  "name": "dsh-mobile",
+  "version": "0.1.0",
+  "description": "A Liquid Glass iOS shell and LAN bridge that brings your local DeepSeek Harness to your phone.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "web-dist",
+    "cordis.patch.yml",
+    "assets/icon.png",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22",
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "dev": "node --import tsx src/dev/dev-server.ts",
+    "dev:web": "vite --config vite.config.ts",
+    "dev:bridge": "node --import tsx src/dev/dev-server.ts",
+    "build": "pnpm run build:plugin && pnpm run build:web",
+    "build:plugin": "node scripts/build-plugin.mjs",
+    "build:web": "vite build --config vite.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "screenshots": "node --import tsx scripts/screenshots.ts",
+    "site": "node scripts/make-site.mjs",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/ws": "^8.5.13",
+    "@vitejs/plugin-react": "^4.3.4",
+    "dompurify": "^3.4.17",
+    "esbuild": "^0.24.0",
+    "highlight.js": "^11.11.1",
+    "lucide-react": "^0.468.0",
+    "marked": "^15.0.4",
+    "playwright-core": "^1.49.1",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8",
+    "ws": "^8.18.0"
+  },
+  "packageManager": "pnpm@11.22.0"
+}
