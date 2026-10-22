@@ -4,10 +4,14 @@ import { isAbsolute, resolve } from 'node:path'
 import type { PermissionMode } from '../shared/protocol.ts'
 import { APP_VERSION } from '../shared/protocol.ts'
 
+export type TunnelMode = 'off' | 'quick'
+
 export interface BridgeOptions {
   port: number
   bindHost: string
   publicUrl?: string
+  tunnelMode: TunnelMode
+  cloudflaredBinary: string
   workspace: string
   provider: string
   model: string
@@ -39,6 +43,8 @@ const DEFAULTS = {
   maxPairAttempts: 8,
   pairAttemptWindowSeconds: 600,
   maxBodyBytes: 24 * 1024 * 1024,
+  tunnelMode: 'off' as TunnelMode,
+  cloudflaredBinary: 'cloudflared',
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -91,6 +97,33 @@ function defaultServerName(): string {
   return raw === '' ? 'My DSH' : raw
 }
 
+function tunnelMode(value: unknown, envValue: string | undefined): TunnelMode {
+  const candidate = value ?? envValue
+  if (candidate === undefined || candidate === null || candidate === false) return 'off'
+  if (typeof candidate === 'string') {
+    const normalized = candidate.trim().toLowerCase()
+    if (normalized === '' || normalized === 'off' || normalized === 'none' || normalized === 'false' || normalized === '0') return 'off'
+    if (normalized === 'quick' || normalized === 'cloudflared' || normalized === 'true' || normalized === '1') return 'quick'
+    throw new Error('tunnel must be "off" or "quick"')
+  }
+  if (candidate === true) return 'quick'
+  if (typeof candidate === 'object') {
+    const record = asRecord(candidate)
+    if (record.enabled === false) return 'off'
+    if (record.enabled === true && record.mode === undefined) return 'quick'
+    return tunnelMode(record.mode, undefined)
+  }
+  throw new Error('tunnel must be "off" or "quick"')
+}
+
+function cloudflaredBinary(value: unknown, envValue: string | undefined): string {
+  if (typeof value === 'string' && value.trim() !== '') return value.trim()
+  const tunnel = asRecord(value)
+  if (typeof tunnel.binary === 'string' && tunnel.binary.trim() !== '') return tunnel.binary.trim()
+  if (envValue !== undefined && envValue.trim() !== '') return envValue.trim()
+  return DEFAULTS.cloudflaredBinary
+}
+
 function privateV4Score(address: string): number {
   const parts = address.split('.').map(Number)
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return 9
@@ -125,6 +158,9 @@ export function resolveBridgeOptions(raw: unknown, env: NodeJS.ProcessEnv = proc
   const envStateDir = env.DSH_MOBILE_STATE_DIR !== undefined && env.DSH_MOBILE_STATE_DIR.trim() !== '' ? env.DSH_MOBILE_STATE_DIR : undefined
   const stateDir = resolve(str(config.stateDir, envStateDir ?? resolve(home, 'dsh-mobile')))
   const webDist = str(config.webDist, env.DSH_MOBILE_WEB_DIST ?? '') || undefined
+  const tunnelConfig = asRecord(config.tunnel)
+  const mode = tunnelMode(config.tunnel, env.DSH_MOBILE_TUNNEL)
+  const cloudflared = cloudflaredBinary(config.cloudflaredBinary ?? tunnelConfig.binary, env.DSH_MOBILE_CLOUDFLARED)
   const permissionMode = str(
     config.permissionMode,
     env.DSH_MOBILE_PERMISSION_MODE ?? DEFAULTS.permissionMode,
@@ -147,6 +183,8 @@ export function resolveBridgeOptions(raw: unknown, env: NodeJS.ProcessEnv = proc
     ...(normalizeBaseUrl(str(config.publicUrl, env.DSH_MOBILE_PUBLIC_URL ?? '')) !== undefined
       ? { publicUrl: normalizeBaseUrl(str(config.publicUrl, env.DSH_MOBILE_PUBLIC_URL ?? '')) }
       : {}),
+    tunnelMode: mode,
+    cloudflaredBinary: cloudflared,
     workspace,
     provider: str(config.provider, env.DSH_MOBILE_PROVIDER ?? DEFAULTS.provider),
     model: str(config.model, env.DSH_MOBILE_MODEL ?? DEFAULTS.model),

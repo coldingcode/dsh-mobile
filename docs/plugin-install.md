@@ -20,7 +20,7 @@ dsh-mobile 的根目录本身就是一个 DSH bundle 包：
 
 - DSH 0.2.1-rc.2 或兼容的 0.2.x（<code>engines.dsh</code> 声明为 <code>&gt;=0.2.1-rc.2 &lt;0.3.0</code>）
 - Node 22+
-- 电脑和手机在同一局域网
+- 默认要求电脑和手机在同一局域网；外网访问可用 <code>tunnel: quick</code> 或 <code>publicUrl</code>（见 [外网访问](remote-access.md)）
 - 插件运行时能访问 <code>dsh --profile sdk</code>。桌面版会优先使用安装目录里的 CLI；如果找不到，会回退到 PATH 上的 <code>dsh</code>
 
 ## 方式 A：一键安装脚本
@@ -90,6 +90,7 @@ profile 名可能是 <code>desktop</code>、<code>web</code>、<code>tui</code>�
         permissionMode: workspace-write
         provider: deepseek-official
         model: deepseek-flash
+        tunnel: off
         openPairingPage: true
         printTerminalQr: true
 ~~~
@@ -119,7 +120,13 @@ DSH 日志里应出现：
 [dsh-mobile] phone URLs: http://127.0.0.1:47821  http://192.168.1.20:47821
 ~~~
 
-如果只看到 127.0.0.1，说明没有检测到局域网地址；检查网卡、防火墙，或设置 <code>publicUrl</code>。
+如果启用了 quick tunnel，还会看到：
+
+~~~text
+[dsh-mobile] quick tunnel ready: https://xxxx.trycloudflare.com
+~~~
+
+如果只看到 127.0.0.1，说明没有检测到局域网地址；检查网卡、防火墙，或设置 <code>publicUrl</code>/<code>tunnel: quick</code>。
 
 ## 配置项
 
@@ -127,7 +134,9 @@ DSH 日志里应出现：
 | --- | --- | --- | --- |
 | port | number | 47821 | 监听端口；0 表示随机 |
 | bindHost | string | 0.0.0.0 | 监听地址 |
-| publicUrl | string | 未设置 | 手机侧根 URL，例如 https://dsh.example.com |
+| publicUrl | string | 未设置 | 固定的手机侧根 URL，例如 https://dsh.example.com |
+| tunnel | string | off | quick = 启动 Cloudflare quick tunnel；与 publicUrl 二选一 |
+| cloudflaredBinary | string | cloudflared | cloudflared 可执行文件路径 |
 | workspace | string | process.cwd() | 默认工作目录 |
 | provider | string | deepseek-official | SDK 模型 provider |
 | model | string | deepseek-flash | SDK 模型 |
@@ -146,7 +155,7 @@ DSH 日志里应出现：
 | sdkCommand | string | 自动 | 覆盖 SDK 启动命令 |
 | sdkArgs | string[] | 自动 | 覆盖 SDK 启动参数 |
 
-环境变量覆盖（同名逻辑）：<code>DSH_MOBILE_PORT</code>、<code>DSH_MOBILE_BIND</code>、<code>DSH_MOBILE_PUBLIC_URL</code>、<code>DSH_MOBILE_WORKSPACE</code>、<code>DSH_MOBILE_PERMISSION_MODE</code>、<code>DSH_MOBILE_PROVIDER</code>、<code>DSH_MOBILE_MODEL</code>、<code>DSH_MOBILE_SERVER_NAME</code>、<code>DSH_MOBILE_STATE_DIR</code>、<code>DSH_MOBILE_OPEN_PAIRING_PAGE</code>、<code>DSH_MOBILE_PRINT_QR</code>、<code>DSH_MOBILE_AUTO_APPROVE</code>、<code>DSH_MOBILE_SDK_COMMAND</code>、<code>DSH_MOBILE_SDK_ARGS</code>。
+环境变量覆盖（同名逻辑）：<code>DSH_MOBILE_PORT</code>、<code>DSH_MOBILE_BIND</code>、<code>DSH_MOBILE_PUBLIC_URL</code>、<code>DSH_MOBILE_TUNNEL</code>、<code>DSH_MOBILE_CLOUDFLARED</code>、<code>DSH_MOBILE_WORKSPACE</code>、<code>DSH_MOBILE_PERMISSION_MODE</code>、<code>DSH_MOBILE_PROVIDER</code>、<code>DSH_MOBILE_MODEL</code>、<code>DSH_MOBILE_SERVER_NAME</code>、<code>DSH_MOBILE_STATE_DIR</code>、<code>DSH_MOBILE_OPEN_PAIRING_PAGE</code>、<code>DSH_MOBILE_PRINT_QR</code>、<code>DSH_MOBILE_AUTO_APPROVE</code>、<code>DSH_MOBILE_SDK_COMMAND</code>、<code>DSH_MOBILE_SDK_ARGS</code>。
 
 ## 状态目录
 
@@ -185,6 +194,7 @@ $DSH_HOME/dsh-mobile/
 
 **手机扫码后连接失败**
 
+- 如果是外网，日志里是否有 <code>quick tunnel ready</code>，或 <code>publicUrl</code> 是否指向当前反代？
 - 手机和电脑是否在同一个 Wi-Fi？
 - Windows 防火墙是否允许 Node/DeepSeek Harness 的专用网络入站？
 - 电脑是否开了 VPN 导致局域网地址变化？设置 <code>serverName</code>/<code>publicUrl</code> 或关闭 VPN。

@@ -14,7 +14,7 @@
 1. 安装 pnpm 和 Node 22；
 2. <code>pnpm install --frozen-lockfile</code>；
 3. <code>tsc --noEmit</code>；
-4. <code>vitest run</code>（协议、Journal、Pairing、Bridge）；
+4. <code>vitest run</code>（协议、Journal、Pairing、Bridge、Tunnel 解析）；
 5. <code>pnpm build</code>（esbuild 插件 + Vite Web）；
 6. 校验 <code>lib/index.js</code>、<code>lib/pair-page.html</code>、<code>web-dist/index.html</code> 存在；
 7. 上传构建产物。
@@ -45,6 +45,16 @@ v1.0.0
 ~~~
 
 不要使用 <code>v0.1.0-ios</code> 这类 Xcode 不接受的版本号。
+
+## 中继不在这里
+
+GitHub Actions 是**构建和发布**流水线，不是常驻服务器。它不能托管手机到 DSH 的中继：
+
+- 同一 Wi-Fi 由插件直接监听，不需要中继；
+- 外网可用插件内置的 Cloudflare quick tunnel（<code>tunnel: quick</code>），或自建 HTTPS 反代/Tailscale，并设置 <code>publicUrl</code>；
+- 中继必须跑在 Cloudflare、Tailscale 或你的 VPS 上，不能跑在 workflow 里。
+
+详见 [外网访问与中继](remote-access.md)。
 
 ## 签名 Secrets
 
@@ -194,6 +204,12 @@ brew install xcodegen
 - Release 是否存在，tag 是否匹配；
 - 仓库是否私有；
 - <code>SITE_URL</code> 与 Release 资产 URL 是否一致。
+
+**外网二维码打不开**
+
+- 这是插件侧的隧道/反代问题，不是 Actions 的问题；
+- 看插件日志的 <code>quick tunnel ready</code> / <code>publicUrl</code>；
+- 检查 Cloudflare/Tailscale/nginx 的 WebSocket upgrade 和 TLS。
 
 **模拟器截图失败**
 

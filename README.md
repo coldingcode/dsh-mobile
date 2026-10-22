@@ -1,7 +1,7 @@
 # dsh-mobile
 
 > 一个 iOS 26 Liquid Glass 风格的自托管壳，把本机 **DeepSeek Harness** 放到手机上。
-> 扫码绑定 · 局域网直连 · GitHub Actions 构建 · 自签安装，不经过 App Store。
+> 扫码绑定 · 局域网直连 / 可选 Cloudflare 隧道 · GitHub Actions 构建 · 自签安装，不经过 App Store。
 
 ![CI](https://github.com/OWNER/dsh-mobile/actions/workflows/ci.yml/badge.svg)
 ![iOS Build](https://github.com/OWNER/dsh-mobile/actions/workflows/ios.yml/badge.svg)
@@ -40,6 +40,7 @@
 - **安全**：设备令牌只在钥匙串；服务端只存 SHA-256 哈希；可随时在电脑配对页吊销；管理页仅本机可访问。
 - **断线可恢复**：WebSocket 自动重连、一次性 WS ticket、持久化事件日志、重连后补齐消息。
 - **自托管发布**：未签名/已签名 IPA、AltStore 源、OTA manifest、安装页和校验和。
+- **外网可选**：同一 Wi-Fi 默认直连；设置 <code>tunnel: quick</code> 后插件会主动建立 Cloudflare 隧道，手机不在同一网络也能配对。
 
 ---
 
@@ -74,7 +75,7 @@ chmod +x scripts/install-plugin.sh
 [dsh-mobile] pairing page: http://127.0.0.1:47821/pair?admin=...
 ~~~
 
-> 电脑和手机必须在同一局域网。Windows 首次启动可能弹出防火墙提示，请允许 Node/DeepSeek Harness 访问专用网络。
+> 默认是同一 Wi-Fi 直连。Windows 首次启动可能弹出防火墙提示，请允许 Node/DeepSeek Harness 访问专用网络。需要外网访问时见 [外网访问与中继](docs/remote-access.md)。
 
 ### 2. 安装 iPhone App
 
@@ -101,7 +102,7 @@ chmod +x scripts/install-plugin.sh
 4. 在电脑上点「允许连接」。
 5. 手机拿到设备令牌并写入钥匙串，进入对话列表。
 
-之后只要插件重新加载、手机和电脑还在同一网络，App 会自动重连。
+之后只要插件重新加载、手机和电脑还在同一网络，App 会自动重连。使用 Cloudflare quick tunnel 时 URL 每次重启都会变化，需要重新扫码配对；固定域名请用 <code>publicUrl</code> 或 Tailscale。
 
 ---
 
@@ -114,10 +115,12 @@ chmod +x scripts/install-plugin.sh
 │  │   ├─ PairingService   扫码 / 6 位核对 / 设备令牌 / 吊销       │
 │  │   ├─ JournalStore     手机端会话、消息、工具卡片（JSON）      │
 │  │   ├─ BridgeServer     HTTP + WebSocket :47821                 │
+│  │   ├─ Quick Tunnel     可选：outbound Cloudflare relay         │
 │  │   └─ SdkRuntime       spawn dsh --profile sdk                │
 │  └─ 本机文件 / 命令 / 模型 / DSH 会话日志                         │
 └──────────────────────────────┬──────────────────────────────────┘
                                │ LAN HTTP / WebSocket
+                               │ 或 HTTPS -> Cloudflare Tunnel
                                │ Bearer token + one-time WS ticket
 ┌──────────────────────────────┴──────────────────────────────────┐
 │  iPhone · dsh-mobile                                             │
@@ -141,12 +144,12 @@ chmod +x scripts/install-plugin.sh
 | 风险 | 处理 |
 | --- | --- |
 | 谁可以配对 | 配对码 10 分钟轮换；电脑端人工允许；两侧核对 6 位数字 |
-| 配对页被局域网访问 | 只接受 loopback（127.0.0.1/::1）+ 每次启动随机 admin token |
+| 配对页被局域网/隧道访问 | 只接受直接 loopback（127.0.0.1/::1），拒绝代理头 + 每次启动随机 admin token |
 | 设备令牌泄露 | 只保存在 iOS 钥匙串 / HttpOnly SameSite=Strict Cookie；服务端只存 SHA-256 |
 | 令牌长期有效 | 180 天；配对页可随时移除设备 |
 | 重放 | 配对码一次性；请求 3 分钟过期；WebSocket 需要 30 秒一次性 ticket |
 | 跨站请求 | Origin 校验、SameSite Cookie、限流 |
-| 明文 HTTP | 默认局域网 HTTP（令牌保护）；公网请用 HTTPS 反代 / Tailscale 并设置 <code>publicUrl</code> |
+| 明文 HTTP | 默认局域网 HTTP（令牌保护）；公网请用 HTTPS 反代 / Tailscale 并设置 <code>publicUrl</code>。内置 quick tunnel 由 Cloudflare 终止 TLS，Cloudflare 能看到 HTTP 内容 |
 | 权限过大 | 默认 <code>workspace-write</code>；<code>danger-full-access</code> 会显式警告；需要审批的操作 fail closed |
 
 > 这是个人自托管工具，不是多租户服务。只在自己信任的网络和设备上配对。不要在没有 TLS 的公网暴露端口。
@@ -167,6 +170,7 @@ chmod +x scripts/install-plugin.sh
         permissionMode: workspace-write
         provider: deepseek-official
         model: deepseek-flash
+        tunnel: off          # quick: optional Cloudflare relay for remote access
         openPairingPage: true
         printTerminalQr: true
 ~~~
@@ -175,7 +179,9 @@ chmod +x scripts/install-plugin.sh
 | --- | --- | --- |
 | <code>port</code> | 47821 | 端口被占用时自动尝试后续 9 个端口，再退到随机端口 |
 | <code>bindHost</code> | 0.0.0.0 | 手机访问需要非 loopback 地址 |
-| <code>publicUrl</code> | 未设置 | HTTPS 反代 / Tailscale 根地址；二维码会使用它 |
+| <code>publicUrl</code> | 未设置 | 固定 HTTPS 反代 / Tailscale / 命名隧道根地址；二维码会使用它 |
+| <code>tunnel</code> | off | <code>quick</code> 启用 Cloudflare quick tunnel；URL 每次重启变化 |
+| <code>cloudflaredBinary</code> | cloudflared | cloudflared 可执行文件路径（不在 PATH 时设置） |
 | <code>workspace</code> | 进程 cwd | 默认工作目录 |
 | <code>permissionMode</code> | workspace-write | 或 danger-full-access |
 | <code>provider</code> / <code>model</code> | deepseek-official / deepseek-flash | SDK 模型路由 |
@@ -185,7 +191,7 @@ chmod +x scripts/install-plugin.sh
 | <code>autoApprove</code> | false | 仅开发/自动化；生产保持 false |
 | <code>stateDir</code> | $DSH_HOME/dsh-mobile | 设备、会话日志和状态目录 |
 
-环境变量：<code>DSH_MOBILE_PORT</code>、<code>DSH_MOBILE_BIND</code>、<code>DSH_MOBILE_PUBLIC_URL</code>、<code>DSH_MOBILE_WORKSPACE</code>、<code>DSH_MOBILE_PERMISSION_MODE</code>、<code>DSH_MOBILE_MODEL</code>、<code>DSH_MOBILE_SERVER_NAME</code>、<code>DSH_MOBILE_STATE_DIR</code>。
+环境变量：<code>DSH_MOBILE_PORT</code>、<code>DSH_MOBILE_BIND</code>、<code>DSH_MOBILE_PUBLIC_URL</code>、<code>DSH_MOBILE_TUNNEL</code>、<code>DSH_MOBILE_CLOUDFLARED</code>、<code>DSH_MOBILE_WORKSPACE</code>、<code>DSH_MOBILE_PERMISSION_MODE</code>、<code>DSH_MOBILE_MODEL</code>、<code>DSH_MOBILE_SERVER_NAME</code>、<code>DSH_MOBILE_STATE_DIR</code>。
 
 **关于审批**：SDK <code>dsh --profile sdk</code> 没有手机端审批回调。<code>workspace-write</code> 下需要审批的工具调用会 fail closed；如果希望手机端执行所有命令，请切换到 <code>danger-full-access</code>，并确认网络可信。
 
@@ -198,7 +204,7 @@ chmod +x scripts/install-plugin.sh
 ~~~bash
 pnpm install
 pnpm build          # lib/index.js + web-dist/
-pnpm test           # 协议、日志、配对、桥接集成测试
+pnpm test           # 协议、日志、配对、桥接、隧道解析测试
 pnpm typecheck
 ~~~
 
@@ -257,7 +263,7 @@ open dsh-mobile.xcodeproj
 - **没有逐 token 流式输出**：SDK 只转发已提交的 session event；界面显示运行状态和工具进度，最终文本在完成时出现。
 - **停止会重启**：SDK 没有单轮取消；「停止」重启运行时并中断所有运行中的会话，UI 会先确认。
 - **没有手机端审批**：见上文，默认失败关闭。
-- **没有内置公网隧道**：请自己加 Tailscale / Cloudflare Tunnel / HTTPS 反代，并配置 <code>publicUrl</code>。
+- **内置的是 Cloudflare quick tunnel，不是自建中继**：它需要电脑能访问 Cloudflare，URL 每次重启变化，且 Cloudflare 会看到 TLS 解密后的 HTTP；隐私敏感场景请用 Tailscale 或自建反代。GitHub Actions 只负责打包，不能托管中继。
 - **iOS 26 风格是自绘的**：不依赖 Xcode 26 的 <code>glassEffect</code>，可在 iOS 17+ / Xcode 16 构建。
 - **未签名 IPA 不能直接安装**：必须自签或 AltStore/SideStore；GitHub Actions 无法凭空生成受信任签名。
 - **只实现 iOS**：Android 和桌面端未实现。
@@ -271,6 +277,7 @@ open dsh-mobile.xcodeproj
 - [在 DSH 中安装/升级插件](docs/plugin-install.md)
 - [iOS 自签安装与信任](docs/ios-install.md)
 - [GitHub Actions、签名 Secrets 与 Pages](docs/github-actions.md)
+- [外网访问与中继](docs/remote-access.md)
 - [设计系统：iOS 26 Liquid Glass](docs/design.md)
 
 ## License

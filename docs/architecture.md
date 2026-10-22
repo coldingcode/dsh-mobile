@@ -12,6 +12,7 @@ dsh-mobile 的目标是把**本机** DSH 的执行能力带到一个受信任的
 │  ├─ BridgeServer        node:http + ws                    │
 │  ├─ PairingService      配对码 / 6 位核对 / 设备令牌       │
 │  ├─ JournalStore        会话摘要 + 事件抽屉（JSON 文件）   │
+│  ├─ Quick Tunnel        可选：outbound Cloudflare relay    │
 │  └─ SdkRuntime          spawn dsh --profile sdk           │
 │                                                           │
 │  DSH SDK 子进程（stdio JSON-RPC）                         │
@@ -20,6 +21,7 @@ dsh-mobile 的目标是把**本机** DSH 的执行能力带到一个受信任的
 │  └─ session.event / session.status / subagent.*           │
 └──────────────────────────────┬────────────────────────────┘
                                │ 局域网 HTTP + WebSocket
+                               │ 或 HTTPS -> Cloudflare Tunnel
                                │ Bearer token / one-time ticket
 ┌──────────────────────────────┴────────────────────────────┐
 │ iPhone                                                    │
@@ -55,8 +57,21 @@ dsh-mobile 选择官方 **SDK stdio JSON-RPC** 作为集成面：
 2. 插件解析配置和环境变量，创建 <code>MobileBridge</code>。
 3. 读取 <code>$DSH_HOME/dsh-mobile/devices.json</code> 和 <code>sessions/*.json</code>。
 4. 在配置端口监听；忙则尝试后续 9 个端口，再退到随机端口。
-5. 构造配对码、管理令牌和二维码；打印日志，可选自动打开本机配对页。
-6. 手机首次连接时，SDK 子进程才会被懒启动。
+5. 如果 <code>tunnel: quick</code>，主动建立到 Cloudflare 的出站隧道，等公网 URL 可用后再继续。
+6. 构造配对码、管理令牌和二维码；打印日志，可选自动打开本机配对页。
+7. 手机首次连接时，SDK 子进程才会被懒启动。
+
+## 网络与中继
+
+默认是**设备到设备直连**：插件是服务端，手机访问电脑的局域网 IP，不需要中继。
+
+外网访问是可选能力：
+
+- <code>tunnel: quick</code>：插件启动 <code>cloudflared</code> 子进程，建立**出站** quick tunnel；Cloudflare 终止 TLS 并把 HTTP/WS 转回本机。URL 每次重启变化，Cloudflare 能看到明文请求。
+- <code>publicUrl</code>：你自己提供固定 HTTPS 反代、命名 Cloudflare Tunnel 或 Tailscale，插件不再启动隧道，二维码使用该地址。
+- GitHub Actions 只构建 IPA，不托管中继；中继必须运行在 Cloudflare、Tailscale 或 VPS 上。
+
+详见 [外网访问与中继](remote-access.md)。
 
 ## 配对
 
@@ -141,6 +156,8 @@ SDK 只会发送**已经提交**的 session event。JournalStore 把原始事件
 | 令牌被吊销 | App 收到 401，显示重新配对页 |
 | 配对码过期 | 手机收到 403，提示刷新电脑配对页 |
 | WebSocket 丢事件 | 客户端重连后通过 REST 拉取完整会话，补齐缺口 |
+| quick tunnel 启动失败 | 记录错误并回退到局域网地址；配对页仍可用 |
+| quick tunnel URL 变化 | 旧 profile 失效，重新扫码；固定地址请用 publicUrl |
 
 ## 性能
 

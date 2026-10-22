@@ -94,6 +94,17 @@ describe('MobileBridge', () => {
     expect(activity.items.length).toBeGreaterThan(0)
   })
 
+  it('keeps admin endpoints local even behind a tunnel header', async () => {
+    const response = await fetch(base + '/admin/state?admin=' + encodeURIComponent(bridge.adminToken), {
+      headers: { 'cf-connecting-ip': '203.0.113.7' },
+    })
+    expect(response.status).toBe(403)
+    const page = await fetch(base + '/pair?admin=' + encodeURIComponent(bridge.adminToken), {
+      headers: { 'x-forwarded-for': '203.0.113.7' },
+    })
+    expect(page.status).toBe(403)
+  })
+
   it('opens an authenticated websocket and sends a hello frame', async () => {
     const auth = { authorization: 'Bearer ' + token, 'content-type': 'application/json' }
     const ticket = await fetch(base + '/api/ws-ticket', { method: 'POST', headers: auth, body: '{}' }).then((response) => response.json()) as { ticket: string }

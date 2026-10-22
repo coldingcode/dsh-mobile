@@ -13,5 +13,11 @@
         permissionMode: workspace-write
         provider: deepseek-official
         model: deepseek-flash
+        # Same Wi-Fi: leave this off; the phone connects directly to this computer.
+        # "quick" starts an outbound Cloudflare quick tunnel, so the phone can
+        # connect from another network. The URL changes on every restart and
+        # Cloudflare relays plaintext HTTP; use publicUrl for a stable named tunnel.
+        tunnel: off
+        # cloudflaredBinary: cloudflared
         openPairingPage: true
         printTerminalQr: true

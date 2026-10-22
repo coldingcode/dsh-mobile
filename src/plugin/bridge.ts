@@ -31,6 +31,7 @@ import { openExternal } from './opener.ts'
 import { renderPairPage } from './pair-page.ts'
 import { PairingService } from './pairing.ts'
 import { SdkRuntime, type PromptBlock, type RuntimeCallbacks } from './runtime.ts'
+import { startQuickTunnel, type QuickTunnelHandle } from './tunnel.ts'
 import {
   APP_CSP,
   PAIR_CSP,
@@ -73,6 +74,7 @@ export interface BridgeRuntimeInfo {
   localUrls: string[]
   pairingUrl: string
   fingerprint: string
+  tunnelUrl?: string
 }
 
 interface AuthResult {
@@ -98,6 +100,18 @@ function privateV4Score(address: string): number {
   if (a === 172 && b >= 16 && b <= 31) return 2
   if (a === 169 && b === 254) return 6
   return 5
+}
+
+function isDirectLoopback(req: IncomingMessage): boolean {
+  if (!isLoopbackAddress(req.socket.remoteAddress)) return false
+  // A local reverse proxy (cloudflared, nginx, ...) also connects from
+  // loopback. Admin/pairing endpoints must stay local even when the bridge is
+  // intentionally exposed through a tunnel.
+  if (req.headers['cf-connecting-ip'] !== undefined) return false
+  if (req.headers['x-forwarded-for'] !== undefined) return false
+  if (req.headers['x-real-ip'] !== undefined) return false
+  if (req.headers['forwarded'] !== undefined) return false
+  return true
 }
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -170,6 +184,8 @@ export class MobileBridge {
   #runtimeStatus: RuntimeStatus = { state: 'stopped' }
   #server: Server | undefined
   #wss: WebSocketServer | undefined
+  #tunnel: QuickTunnelHandle | undefined
+  #tunnelUrl: string | undefined
   #port = 0
   #started = false
   #stopping = false
@@ -256,6 +272,20 @@ export class MobileBridge {
     this.#wss = new WebSocketServer({ noServer: true, perMessageDeflate: false, maxPayload: 1024 * 1024 })
     const port = await this.#listen()
     this.#port = port
+    if (this.#options.tunnelMode === 'quick' && this.#options.publicUrl === undefined) {
+      this.#log('starting Cloudflare quick tunnel (traffic is relayed through Cloudflare)')
+      try {
+        this.#tunnel = await startQuickTunnel({
+          binary: this.#options.cloudflaredBinary,
+          localUrl: 'http://127.0.0.1:' + String(port),
+          timeoutMs: 30_000,
+        })
+        this.#tunnelUrl = this.#tunnel.url
+        this.#log('quick tunnel ready: ' + this.#tunnelUrl)
+      } catch (error) {
+        this.#log('quick tunnel failed: ' + (error instanceof Error ? error.message : String(error)))
+      }
+    }
     this.#started = true
     this.#pingTimer = setInterval(() => this.#tick(), 25_000)
     this.#pingTimer.unref?.()
@@ -264,8 +294,8 @@ export class MobileBridge {
     this.#log('pairing page: ' + this.#pairingPageUrl())
     const urls = this.#localUrls()
     if (urls.length > 1) this.#log('phone URLs: ' + urls.join('  '))
-    if (this.#advertisedHost() === '127.0.0.1') {
-      this.#log('warning: no LAN address was detected. Join the phone to the same network or set publicUrl.')
+    if (this.#advertisedHost() === '127.0.0.1' && this.#tunnelUrl === undefined && this.#options.publicUrl === undefined) {
+      this.#log('warning: no LAN address was detected. Join the phone to the same network, set publicUrl, or enable tunnelMode: quick.')
     }
     if (this.#options.printTerminalQr) void this.#printTerminalQr()
     if (this.#options.openPairingPage && this.#deps.suppressOpen !== true) {
@@ -285,6 +315,7 @@ export class MobileBridge {
       localUrls: urls,
       pairingUrl: this.#pairingPageUrl(),
       fingerprint: pairing.fingerprint,
+      ...(this.#tunnelUrl !== undefined ? { tunnelUrl: this.#tunnelUrl } : {}),
     }
   }
 
@@ -318,6 +349,13 @@ export class MobileBridge {
         server.closeAllConnections?.()
       })
     }
+    try {
+      await this.#tunnel?.stop()
+    } catch {
+      /* ignore */
+    }
+    this.#tunnel = undefined
+    this.#tunnelUrl = undefined
     try {
       await this.#runtime?.stop()
     } catch {
@@ -654,7 +692,7 @@ export class MobileBridge {
   }
 
   #servePairPage(req: IncomingMessage, res: ServerResponse, url: URL): void {
-    if (!isLoopbackAddress(req.socket.remoteAddress)) {
+    if (!isDirectLoopback(req)) {
       sendText(res, 403, 'text/plain; charset=utf-8', '配对页只能在本机打开。')
       return
     }
@@ -676,7 +714,7 @@ export class MobileBridge {
   }
 
   async #handleAdmin(req: IncomingMessage, res: ServerResponse, url: URL, method: string): Promise<void> {
-    if (!isLoopbackAddress(req.socket.remoteAddress)) throw new BridgeError(403, 'loopback-only', '管理接口只允许本机访问')
+    if (!isDirectLoopback(req)) throw new BridgeError(403, 'loopback-only', '管理接口只允许本机访问')
     const token = url.searchParams.get('admin') ?? (typeof req.headers['x-dsh-mobile-admin'] === 'string' ? req.headers['x-dsh-mobile-admin'] : '')
     if (!safeEqual(token, this.#adminToken)) throw new BridgeError(401, 'admin-unauthorized', '管理令牌无效')
     const pairing = this.#pairing
@@ -878,6 +916,7 @@ export class MobileBridge {
   }
 
   #serverUrl(): string {
+    if (this.#tunnelUrl !== undefined) return this.#tunnelUrl
     if (this.#options.publicUrl !== undefined) return this.#options.publicUrl
     return 'http://' + hostForUrl(this.#advertisedHost()) + ':' + String(this.#port)
   }
@@ -891,6 +930,7 @@ export class MobileBridge {
 
   #localUrls(): string[] {
     const urls: string[] = []
+    if (this.#tunnelUrl !== undefined) urls.push(this.#tunnelUrl)
     if (this.#options.publicUrl !== undefined) urls.push(this.#options.publicUrl)
     urls.push('http://127.0.0.1:' + String(this.#port))
     const interfaces = networkInterfaces()

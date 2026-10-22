@@ -26,7 +26,7 @@ JSON：
 | 字段 | 说明 |
 | --- | --- |
 | v | 固定 1 |
-| u | 桥接根地址（可被手机访问的地址，必要时是 publicUrl） |
+| u | 桥接根地址（局域网 IP、固定 publicUrl，或 tunnel: quick 生成的 https://*.trycloudflare.com） |
 | c | 当前 8 位配对码，显示为 XXXX-XXXX |
 | n | 服务器显示名 |
 | exp | 配对码过期时间（Unix 毫秒） |
@@ -227,7 +227,7 @@ Prompt 请求：
 
 ## 管理端点（仅 loopback）
 
-管理页 <code>/pair?admin=...</code> 需要 loopback，并且 admin token 必须匹配（query 参数 <code>admin</code> 或 header <code>x-dsh-mobile-admin</code>）。
+管理页 <code>/pair?admin=...</code> 需要 loopback，并且 admin token 必须匹配（query 参数 <code>admin</code> 或 header <code>x-dsh-mobile-admin</code>）。带 <code>cf-connecting-ip</code>、<code>x-forwarded-for</code>、<code>x-real-ip</code> 或 <code>forwarded</code> 的代理请求会被拒绝，避免隧道把管理面暴露出去。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -292,5 +292,6 @@ ws://<host>:<port>/ws?ticket=<one-time-ticket>
 - 配对码不是长期凭证；它只用于发起一次请求。
 - 设备令牌是高熵随机串，服务端仅存哈希。
 - 管理页 admin token 每次进程启动重新生成，不写盘。
-- 默认明文 HTTP 只用于局域网；跨公网请使用 HTTPS 终止代理，并设置 <code>publicUrl</code>。
+- 默认明文 HTTP 只用于局域网；跨公网请使用 HTTPS 终止代理并设置 <code>publicUrl</code>，或显式启用 <code>tunnel: quick</code>。
+- quick tunnel 由 Cloudflare 终止 TLS，Cloudflare 能看到解密后的 HTTP；设备令牌和配对码仍是应用层保护。隐私敏感场景请用 Tailscale/自建反代。
 - 不要通过不可信网络分享带 admin token 的配对 URL。
