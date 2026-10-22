@@ -24,8 +24,14 @@ dsh-mobile 不经过 App Store。iOS 也不允许像 Android 那样直接安装�
 AltStore 和 SideStore 都使用你的免费 Apple ID 在设备上重签。免费账号的签名 7 天过期，AltStore 会在后台刷新；SideStore 需要先完成配对文件。
 
 1. 在 GitHub 仓库启用 Pages：**Settings → Pages → Source: GitHub Actions**。
-2. 打一个 <code>v0.1.0</code> 标签，或手动运行 iOS workflow。
-3. 等 **Deploy to GitHub Pages** 成功。
+2. 打一个 <code>v0.1.0</code> 标签并 push。**只在 Actions 里手动运行 main 不会发布 Release，也不会部署 Pages。**
+
+   ~~~bash
+   git tag v0.1.0
+   git push origin v0.1.0
+   ~~~
+
+3. 等 **Create GitHub Release** 和 **Deploy to GitHub Pages** 两步成功（不能是 skipped）。
 4. 安装页地址：
 
    ~~~text

@@ -81,8 +81,13 @@ chmod +x scripts/install-plugin.sh
 
 推荐流程（不需要 Apple 开发者账号）：
 
-1. 把仓库推到 GitHub，启用 Actions 和 Pages（Settings → Pages → Source: GitHub Actions）。
-2. 运行 **iOS Build & Self-hosted Release**，或打一个 <code>v0.1.0</code> 标签。
+1. 把仓库推到 GitHub，启用 Actions 和 Pages（Settings → Pages → Source: **GitHub Actions**）。
+2. 打一个 <code>v0.1.0</code> 标签并 push（或发布一个以该 tag 为基础的 Release）。**只手动 Run workflow 在 main 上只会构建 artifacts，不会创建 Release、也不会部署 Pages。**
+
+   ~~~bash
+   git tag v0.1.0
+   git push origin v0.1.0
+   ~~~
 3. 添加 AltStore 源：
 
    ~~~text

@@ -101,9 +101,26 @@ GitHub Actions 是**构建和发布**流水线，不是常驻服务器。它不�
 启用：
 
 1. 仓库 **Settings → Pages**；
-2. Source 选择 **GitHub Actions**；
+2. Source 选择 **GitHub Actions**（不是 “Deploy from a branch”）；
 3. 运行一次 tag 构建；
 4. workflow 里的 <code>deploy-pages</code> 会发布 <code>site/</code>。
+
+### 常见误用：手动运行 main 不会发布
+
+在 Actions 页面点 **Run workflow** 并选择 <code>main</code> 时：
+
+- 会构建并上传 <code>dsh-mobile-ios</code> artifact；
+- **不会**创建 GitHub Release；
+- **不会**部署 Pages。
+
+因为 Release/Pages 步骤的条件是 <code>refs/tags/*</code>。必须推送 tag：
+
+~~~bash
+git tag v0.1.0
+git push origin v0.1.0
+~~~
+
+如果 Pages Source 还是 “Deploy from a branch”，访问 <code>https://OWNER.github.io/dsh-mobile/</code> 看到的是 Jekyll 渲染的仓库 README，而不是安装页；<code>/altstore.json</code> 也会 404。
 
 默认地址：
 

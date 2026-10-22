@@ -245,6 +245,24 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Publishing status
+        if: always()
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "### Publishing" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Tag: $GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Release and Pages deployment requested." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Release and Pages are only published for tags. This run uploaded artifacts only. Push a tag, e.g. git tag v0.1.0 && git push origin v0.1.0."
+            echo "### Publishing skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "This run was on $GITHUB_REF." >> "$GITHUB_STEP_SUMMARY"
+            echo "Release and Pages are only published for tags." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Push a tag to publish:" >> "$GITHUB_STEP_SUMMARY"
+            echo "    git tag v0.1.0" >> "$GITHUB_STEP_SUMMARY"
+            echo "    git push origin v0.1.0" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
