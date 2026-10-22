@@ -78,7 +78,80 @@ tunnel: off
 
 ## 方案 C：命名 Cloudflare Tunnel / 自有 HTTPS 反代
 
-如果你已经有域名和反向代理（Cloudflare Named Tunnel、nginx、Caddy、frp + nginx 等），让公网 HTTPS 根路径指向本机桥接：
+### C1. Cloudflare 控制台配置（推荐）
+
+前提：你有一个域名，并且已经把它的 DNS 托管到 Cloudflare（Nameservers 已生效）。
+
+1. 打开 **Cloudflare Zero Trust** → **Networks** → **Tunnels**。
+2. **Create a tunnel** → 选择 **Cloudflared** → 名称填 <code>dsh-mobile</code>。
+3. 选择 **Windows 64-bit**，复制页面给出的安装命令。命令里包含 tunnel token，**不要提交到 Git 或发给别人**。
+4. 在 PowerShell（管理员）运行安装命令，例如：
+
+   ~~~powershell
+   cloudflared.exe service install <tunnel-token>
+   ~~~
+
+   然后用 <code>Get-Service cloudflared</code> 确认服务已启动。
+
+5. 回到 tunnel 的 **Public Hostname** → **Add a public hostname**：
+   - Subdomain: <code>dsh</code>
+   - Domain: 你的域名，例如 <code>example.com</code>
+   - Path: 留空
+   - Service: **HTTP**
+   - URL: <code>localhost:47821</code>
+6. 保存后 Cloudflare 会自动创建 <code>dsh.example.com</code> 的 CNAME，**不要**再手动加 A 记录，也不要做端口映射。
+7. 测试：
+
+   ~~~bash
+   curl https://dsh.example.com/api/health
+   ~~~
+
+   返回 JSON 就说明隧道通了。
+
+8. 插件配置：
+
+   ~~~yaml
+   publicUrl: https://dsh.example.com
+   tunnel: off
+   port: 47821
+   ~~~
+
+   如果只通过隧道访问，可以把 <code>bindHost</code> 改成 <code>127.0.0.1</code>；如果还想保留局域网直连，保持 <code>0.0.0.0</code>。
+
+9. 重启 DSH，确认日志里的 <code>pairing page</code> 和 QR 使用 <code>https://dsh.example.com</code>，然后扫码配对。
+
+> 把插件的 <code>port</code> 固定为 47821。插件在端口被占用时会自动换端口；命名隧道的 Public Hostname 固定指向 47821，换端口后公网入口会失效。
+
+### C2. 命令行创建命名隧道
+
+如果你不想用控制台，等价流程：
+
+~~~bash
+cloudflared tunnel login
+cloudflared tunnel create dsh-mobile
+cloudflared tunnel route dns dsh-mobile dsh.example.com
+~~~
+
+```yaml
+tunnel: <tunnel-uuid>
+credentials-file: C:\Users\<you>\.cloudflared\<tunnel-uuid>.json
+ingress:
+  - hostname: dsh.example.com
+    service: http://127.0.0.1:47821
+  - service: http_status:404
+```
+
+然后：
+
+~~~bash
+cloudflared tunnel run dsh-mobile
+~~~
+
+同样配置 <code>publicUrl</code> 和 <code>tunnel: off</code>。
+
+### C3. 自有 HTTPS 反代
+
+如果你已经有 nginx/Caddy/frp，让公网 HTTPS 根路径指向本机桥接：
 
 ~~~text
 https://dsh.example.com  ->  http://127.0.0.1:47821
